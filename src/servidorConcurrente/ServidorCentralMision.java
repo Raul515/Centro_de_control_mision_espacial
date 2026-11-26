@@ -68,7 +68,7 @@ public class ServidorCentralMision {
     public static void difundir(String mensaje){
         synchronized(clientesConectados){
             for(ManejadorCliente c : clientesConectados){
-                //c.enviarMensaje(mensaje);
+                c.enviarMensaje(mensaje);
             }
         }
     }
