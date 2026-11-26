@@ -168,8 +168,9 @@ public class EstadoCohete {
 
     public synchronized int cuentaAtras(){
         if(estado == EstadoMision.CUENTA_ATRAS){
+            if (segundosRestantes > 0) {
             segundosRestantes--;
-            if(segundosRestantes <= 0){
+            } else {
                 estado = EstadoMision.VUELO;
             }
         }
