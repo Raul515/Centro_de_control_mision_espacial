@@ -12,18 +12,15 @@ import herramientas.Rol;
 public class ManejadorCliente implements Runnable{
 
     private Socket s;
-    private Rol rol;
-    private ServidorCentralMision servidorCentral;
-    private EstadoCohete estadoCohete;
+    private Rol rolAsignado;
+    private final EstadoCohete estadoCohete;
 
     private PrintWriter salida;
     private BufferedReader entrada;
     
 
-    public ManejadorCliente(Socket s, Rol rol, ServidorCentralMision servidorCentral, EstadoCohete estadoCohete) {
+    public ManejadorCliente(Socket s, EstadoCohete estadoCohete) {
         this.s = s;
-        this.rol = rol;
-        this.servidorCentral = servidorCentral;
         this.estadoCohete = estadoCohete;
     }
 
@@ -34,8 +31,8 @@ public class ManejadorCliente implements Runnable{
 			salida = new PrintWriter(s.getOutputStream(), true); 
             entrada = new BufferedReader(new InputStreamReader(s.getInputStream()));
 
-			salida.println("Conexion Establecida - Centro de control operativo");
-            salida.println("Por favor, identificate con: LOGIN <ROL> (Roles disponibles: VUELO, PROPULSION, DINAMICA)");
+			enviarMensaje("Conexion Establecida - Centro de control operativo");
+            enviarMensaje("Por favor, identificate con: LOGIN <ROL> (Roles disponibles: VUELO, PROPULSION, DINAMICA)");
 			
 
             String linea;
@@ -54,24 +51,47 @@ public class ManejadorCliente implements Runnable{
 			System.err.println("Error comunicación cliente: " + e.getMessage());
         } finally {
             try {
-                if (entrada != null) entrada.close();
-                if (salida != null) salida.close();
-                if (s != null && !s.isClosed()) s.close();
-            } catch (IOException e) { /* Ignoramos */ }
-            System.out.println("Cliente finalizado.");
+                if (s != null && !s.isClosed()){
+                    s.close();
+                } 
+            } catch (IOException e) {
+                System.err.println("Error al cerrar socket de cliente: " + e.getMessage());
+            }
+            
         }
 
     }
 
-    // Metodo auxiliar para procesar el comando
+    // Getter del rol
+    public Rol getRolAsignado() {
+        return rolAsignado;
+    }
 
+    // Metodo auxiliar para enviar un mensaje
+    // Lo hago synchronized para evitar que varios hilos puedan mezclar lineas
+    public synchronized void enviarMensaje(String mensaje) {
+        if (salida != null) {
+            salida.println(mensaje);
+        }
+    }
+
+    // Metodo auxiliar para procesar los comandos
     private boolean procesarComando(String linea){
-        String[] partes = linea.split(" ");
+        String[] partes = linea.split(Protocolo.separador);
         String comando = partes[0].toUpperCase();
 
         switch (comando) {
             case Protocolo.CMD_ABORTAR:
-                // Hacer logica aborto
+                if (rolAsignado != null){
+                    boolean abortado = estadoCohete.abortarMision("Orden de abortar emitida por: " + rolAsignado);
+                    if(abortado){
+                        salida.println("Aborto Confirmado");
+                    }else{
+                        salida.println("La mision ya estaba abortada o completada");
+                    }
+                }else{
+                    salida.println("No estas autenticado, no puedes abortar");
+                }
                 break;
 
             case Protocolo.CMD_CUENTA_ATRAS:
@@ -91,15 +111,50 @@ public class ManejadorCliente implements Runnable{
                 return false;
 
             case Protocolo.CMD_SEPARAR_ETAPAS:
-                // Hacer logica separacion
+                if(rolAsignado == Rol.PROPULSION || rolAsignado == Rol.DINAMICA){
+                    boolean separado = estadoCohete.separarEtapas();
+                    if(separado){
+                        salida.println("Separacion de las etapas correcta");
+                    }else{
+                        salida.println("No se pueden separar las etapas (el cohete no esta en vuelo o ya esta en etapa 2)");
+                    }
+                }else{
+                    salida.println("Solo los directores de PROPULSION y DINAMICA pueden ordenar la separacion de etapas.");
+                }   
+
                 break;
 
             case Protocolo.CMD_TELEMETRIA:
-                // Hacer logica telemetria
+                // Cualquiera puede consultar la telemetría 
+                salida.println(estadoCohete.toStringTelemetriaVuelo());
                 break;
 
             case Protocolo.CMD_VOTAR:
-                // Hacer logica voto
+                if(rolAsignado != null){
+                    if(partes.length == 2){
+                        String opcion = partes[1].toUpperCase();
+                        boolean esGO = false;
+                        if(opcion.equals("GO")){
+                            esGO = true;
+                        }else if (opcion.equals("NOGO")) {
+                            esGO = false;
+                        }else{
+                            salida.println("Opcion no valida, usa GO o NOGO");
+                            return false;
+                        }
+
+                        boolean registrado =  estadoCohete.registrarVoto(rolAsignado, esGO);
+                        if(registrado){
+                            salida.println("Voto registrado correctamente, voto: " + (esGO ? "GO" : "NO-GO"));
+                        }
+
+                    }else{
+                        salida.println("Uso correcto: VOTAR GO o VOTAR NOGO");
+                    }
+
+                }else{
+                    salida.print("Debes identificarte primero con LOGIN");
+                }
                 break;
             default:
                 salida.println(" Comando no reconocido: " + comando); 

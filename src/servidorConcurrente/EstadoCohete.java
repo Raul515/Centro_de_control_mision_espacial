@@ -26,7 +26,7 @@ public class EstadoCohete {
     public EstadoCohete(){
         this.altitud = 0.0;
         this.velocidad = 0.0;
-        this.cantidadCombustible = 0.0;
+        this.cantidadCombustible = 100.0;
         this.etapa = 1;
         this.segundosRestantes = 10;
 
@@ -136,7 +136,7 @@ public class EstadoCohete {
     }
 
     public synchronized boolean comprobarVotosPositivos(){
-        if(estado != EstadoMision.SONDEO || !rolesActivos.isEmpty()){
+        if(estado != EstadoMision.SONDEO || rolesActivos.isEmpty()){
             return false;
         }
         // Comprobamos que todos los roles activos han votado
@@ -188,7 +188,7 @@ public class EstadoCohete {
 
     public synchronized boolean abortarMision(String razon){
         boolean misionAbortada = false;
-        if(estado != EstadoMision.ABORTADA || estado != EstadoMision.COMPLETADA){
+        if(estado != EstadoMision.ABORTADA && estado != EstadoMision.COMPLETADA){
             estado = EstadoMision.ABORTADA;
             misionAbortada = true;
         }
@@ -204,7 +204,7 @@ public class EstadoCohete {
     }
 
     public synchronized String toStringTelemetriaVuelo(){
-        String telemetria = "TELEM|ALT:"+altitud+"|VEL:"+velocidad+"COMBUSTIBLE:"+cantidadCombustible+"ETAPA:"+etapa;
+        String telemetria = "TELEM|ALT:"+altitud+"|VEL:"+velocidad+"|COMBUSTIBLE:"+cantidadCombustible+"|ETAPA:"+etapa;
         return telemetria;
     }
 }
